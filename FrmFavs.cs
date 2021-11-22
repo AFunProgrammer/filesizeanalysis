@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace favs
@@ -14,8 +15,38 @@ namespace favs
         static Queue<String> _qConsoleMessages = new Queue<string>();
         List<String> lstExceptionPath = new List<string>();
         Mutex _mLockMessages = new Mutex(false, "messages");
+        System.Threading.Timer _ReadMessagesTimer = null;
 
         SortedDictionary<String, long> _dPathAndSize = new SortedDictionary<string, long>();
+
+        const UInt32 INVALID_FILE_SIZE = 0xFFFFFFFF;
+
+        [DllImport("kernel32.dll",SetLastError=true)]
+        static extern uint GetCompressedFileSizeW(
+           [In, MarshalAs(UnmanagedType.LPWStr)] string lpFileName,
+           [Out, MarshalAs(UnmanagedType.U4)] out uint lpFileSizeHigh);
+
+        public static long GetFileSizeOnDisk(string filepath)
+        {
+            FileInfo file = new FileInfo(filepath);
+            uint hisize;
+            uint losize = GetCompressedFileSizeW(filepath, out hisize);
+
+            //invalid file size - I don't understand why a file size would have an issue
+            // but probably should investigate further to understand the issue.
+            if (INVALID_FILE_SIZE == losize)
+            {
+                int uiLastError = Marshal.GetLastWin32Error();
+                int uiLastHResult = Marshal.GetHRForLastWin32Error();
+
+                System.Diagnostics.Debug.WriteLine("INVALID_FILE_SIZE: HRESULT: {0:X2} Size: {1} File: {2}", uiLastHResult, file.Length, file.FullName);
+                return file.Length; // return the length in bytes without compression to appx nearest value;
+            }
+
+            long size = ((long)hisize << 32) | losize;
+
+            return size;
+        }
 
         private void GetFilesFromPath(string Path)
         {
@@ -33,7 +64,7 @@ namespace favs
             string strFileSize = "";
             foreach (FileInfo File in Files)
             {
-                float fFileSize = ((float)File.Length / (1024 * 1024));
+                float fFileSize = ((float)GetFileSizeOnDisk(File.FullName) / (1024 * 1024));
 
                 if (fFileSize < 1.0f)
                     strFileSize = String.Format("0 MB", fFileSize * 1024);
@@ -77,7 +108,7 @@ namespace favs
             {
                 Files = Dir.GetFiles();
                 foreach (FileInfo File in Files)
-                    lSizeOnDisk += File.Length;
+                    lSizeOnDisk += GetFileSizeOnDisk(File.FullName); //File.Length;
 
                 _dPathAndSize.Add(Dir.FullName, lSizeOnDisk);
                 return lSizeOnDisk;
@@ -163,8 +194,13 @@ namespace favs
 
         private void PopulateFileSystemView()
         {
-            GetFileSizeFromDir(new DirectoryInfo(@"c:\"));
-            GetSubDirectories(new DirectoryInfo(@"c:\"), null, 3, 0);
+            System.IO.DriveInfo[] allDrives = System.IO.DriveInfo.GetDrives();
+
+            foreach (DriveInfo drive in allDrives)
+            {
+                GetFileSizeFromDir(new DirectoryInfo(drive.Name));
+                GetSubDirectories(new DirectoryInfo(drive.Name), null, 3, 0);
+            }
         }
 
         static int count = 0;
@@ -203,7 +239,7 @@ namespace favs
                        lstConsole.SelectedIndex = lstConsole.Items.Count - 1;
                }));
 
-            System.Diagnostics.Debug.WriteLine("Read From Messages: {0}", count);
+            //System.Diagnostics.Debug.WriteLine("Read From Messages: {0}", count);
         }
 
         private void WriteToMessages(string Out)
@@ -245,7 +281,6 @@ namespace favs
             _fswWindows.EnableRaisingEvents = true;
         }
 
-        System.Threading.Timer _ReadMessagesTimer = null;
         public FrmFavs()
         {
             InitializeComponent();
@@ -288,6 +323,17 @@ namespace favs
         {
             PopulateFileSystemView();
 
+            System.IO.DriveInfo[] allDrives = System.IO.DriveInfo.GetDrives();
+            
+            //foreach (DriveInfo drive in allDrives )
+            //{
+            //    var TotalFreeSpace = drive.TotalFreeSpace;
+            //    var AvailableFreeSpace = drive.AvailableFreeSpace;
+            //
+            //    float fUsedSpace = (float)(drive.TotalSize - drive.AvailableFreeSpace) / (1024 * 1024);
+            //    String strDriveInfo = String.Format("{0} - Used Space {1:###,###.##} MB", drive.Name, fUsedSpace);
+            //    cboDriveList.Items.Add(strDriveInfo);
+            //}
         }
 
         private void trvFileSystem_AfterSelect(object sender, TreeViewEventArgs e)

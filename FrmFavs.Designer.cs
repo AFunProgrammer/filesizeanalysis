@@ -91,9 +91,9 @@
             this.trvFileSystem.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.trvFileSystem.Location = new System.Drawing.Point(0, 0);
+            this.trvFileSystem.Location = new System.Drawing.Point(0, 3);
             this.trvFileSystem.Name = "trvFileSystem";
-            this.trvFileSystem.Size = new System.Drawing.Size(469, 260);
+            this.trvFileSystem.Size = new System.Drawing.Size(469, 257);
             this.trvFileSystem.TabIndex = 4;
             this.trvFileSystem.AfterExpand += new System.Windows.Forms.TreeViewEventHandler(this.trvFileSystem_AfterExpand);
             this.trvFileSystem.AfterSelect += new System.Windows.Forms.TreeViewEventHandler(this.trvFileSystem_AfterSelect);
