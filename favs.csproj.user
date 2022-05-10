@@ -3,9 +3,4 @@
   <PropertyGroup>
     <_LastSelectedProfileId>C:\Users\grandma\Documents\programming\windows\favs\Properties\PublishProfiles\FolderProfile.pubxml</_LastSelectedProfileId>
   </PropertyGroup>
-  <ItemGroup>
-    <Compile Update="FrmFavs.cs">
-      <SubType>Form</SubType>
-    </Compile>
-  </ItemGroup>
 </Project>

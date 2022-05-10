@@ -34,7 +34,7 @@
             this.lvFiles = new System.Windows.Forms.ListView();
             this.chName = new System.Windows.Forms.ColumnHeader();
             this.chSize = new System.Windows.Forms.ColumnHeader();
-            this.lstConsole = new System.Windows.Forms.ListBox();
+            this.trvFileChanges = new System.Windows.Forms.TreeView();
             ((System.ComponentModel.ISupportInitialize)(this.scMainView)).BeginInit();
             this.scMainView.Panel1.SuspendLayout();
             this.scMainView.Panel2.SuspendLayout();
@@ -61,7 +61,7 @@
             // 
             // scMainView.Panel2
             // 
-            this.scMainView.Panel2.Controls.Add(this.lstConsole);
+            this.scMainView.Panel2.Controls.Add(this.trvFileChanges);
             this.scMainView.Size = new System.Drawing.Size(800, 450);
             this.scMainView.SplitterDistance = 266;
             this.scMainView.TabIndex = 0;
@@ -107,10 +107,10 @@
             this.lvFiles.Columns.AddRange(new System.Windows.Forms.ColumnHeader[] {
             this.chName,
             this.chSize});
-            this.lvFiles.Location = new System.Drawing.Point(-1, 0);
+            this.lvFiles.Location = new System.Drawing.Point(-1, 3);
             this.lvFiles.MultiSelect = false;
             this.lvFiles.Name = "lvFiles";
-            this.lvFiles.Size = new System.Drawing.Size(319, 260);
+            this.lvFiles.Size = new System.Drawing.Size(319, 257);
             this.lvFiles.TabIndex = 5;
             this.lvFiles.UseCompatibleStateImageBehavior = false;
             this.lvFiles.View = System.Windows.Forms.View.Details;
@@ -127,17 +127,15 @@
             this.chSize.TextAlign = System.Windows.Forms.HorizontalAlignment.Right;
             this.chSize.Width = 120;
             // 
-            // lstConsole
+            // trvFileChanges
             // 
-            this.lstConsole.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
+            this.trvFileChanges.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
             | System.Windows.Forms.AnchorStyles.Left) 
             | System.Windows.Forms.AnchorStyles.Right)));
-            this.lstConsole.FormattingEnabled = true;
-            this.lstConsole.ItemHeight = 15;
-            this.lstConsole.Location = new System.Drawing.Point(3, 6);
-            this.lstConsole.Name = "lstConsole";
-            this.lstConsole.Size = new System.Drawing.Size(794, 169);
-            this.lstConsole.TabIndex = 3;
+            this.trvFileChanges.Location = new System.Drawing.Point(3, 3);
+            this.trvFileChanges.Name = "trvFileChanges";
+            this.trvFileChanges.Size = new System.Drawing.Size(794, 174);
+            this.trvFileChanges.TabIndex = 0;
             // 
             // FrmFavs
             // 
@@ -166,10 +164,10 @@
 
         private SplitContainer scMainView;
         private TreeView trvFileSystem;
-        private ListBox lstConsole;
         private SplitContainer scSizeView;
         private ListView lvFiles;
         private ColumnHeader chName;
         private ColumnHeader chSize;
+        private TreeView trvFileChanges;
     }
 }

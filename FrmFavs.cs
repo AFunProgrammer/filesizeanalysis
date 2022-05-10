@@ -7,12 +7,35 @@ using System.Windows.Forms;
 
 namespace favs
 {
+    class FileChangeInformation
+    {
+        string m_Name;
+        string m_Path;
+        string m_FullPath;
+        string m_EventMsg;
+        DateTime m_EventTime;
+
+        public string Name { get { return m_Name; } }
+        public string Path { get { return m_Path; } }
+        public string FullPath { get { return m_FullPath; } }
+        public string Message { get { return m_EventMsg; } }
+        public DateTime EventTime { get { return m_EventTime; } }
+
+        public FileChangeInformation(string FullPath, string EventMsg, DateTime EventTime)
+        {
+            m_Name = FullPath.Substring(FullPath.LastIndexOf("\\") + 1);
+            m_Path = FullPath.Substring(0, FullPath.LastIndexOf("\\"));
+            m_FullPath = FullPath;
+            m_EventMsg = EventMsg;
+            m_EventTime = EventTime;
+        }
+    }
     public partial class FrmFavs : Form
     {
         private FileSystemWatcher _fswWindows;
         private static object _oMsgsLock = new object();
         private static object _oLstCtlLock = new object();
-        static Queue<String> _qConsoleMessages = new Queue<string>();
+        static Queue<FileChangeInformation> _qConsoleMessages = new Queue<FileChangeInformation>();
         List<String> lstExceptionPath = new List<string>();
         Mutex _mLockMessages = new Mutex(false, "messages");
         System.Threading.Timer _ReadMessagesTimer = null;
@@ -21,7 +44,7 @@ namespace favs
 
         const UInt32 INVALID_FILE_SIZE = 0xFFFFFFFF;
 
-        [DllImport("kernel32.dll",SetLastError=true)]
+        [DllImport("kernel32.dll", SetLastError = true)]
         static extern uint GetCompressedFileSizeW(
            [In, MarshalAs(UnmanagedType.LPWStr)] string lpFileName,
            [Out, MarshalAs(UnmanagedType.U4)] out uint lpFileSizeHigh);
@@ -87,7 +110,7 @@ namespace favs
             FileInfo[] Files;
             DirectoryInfo[] SubDirs;
             List<DirectoryInfo> Directories = new List<DirectoryInfo>();
-            
+
             try
             {
                 SubDirs = Dir.GetDirectories();
@@ -130,13 +153,13 @@ namespace favs
             return lSizeOnDisk;
         }
 
-        private void GetSubDirectories(DirectoryInfo Dir, TreeNode ParentNode, int MaxDepth, int Depth )
+        private void GetSubDirectories(DirectoryInfo Dir, TreeNode ParentNode, int MaxDepth, int Depth)
         {
             TreeNode Node;
             DirectoryInfo[] SubDirs;
             List<DirectoryInfo> Directories = new List<DirectoryInfo>();
 
-            if (Depth >= MaxDepth )
+            if (Depth >= MaxDepth)
             {
                 return;
             }
@@ -145,7 +168,7 @@ namespace favs
             {
                 SubDirs = Dir.GetDirectories();
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 System.Diagnostics.Debug.WriteLine("Path: {0} Exception: {1}", Dir.FullName, e.Message);
                 return;
@@ -168,7 +191,7 @@ namespace favs
                 Node = trvFileSystem.Nodes.Add(strNodeText);
             else
             {
-                ValueTuple<string, float> vtTag = (ValueTuple<string,float>)ParentNode.Tag;
+                ValueTuple<string, float> vtTag = (ValueTuple<string, float>)ParentNode.Tag;
                 if (vtTag.Item1 == Dir.FullName)
                     Node = ParentNode;
                 else
@@ -183,10 +206,10 @@ namespace favs
                 return;
             }
 
-            while ( Directories.Count > 0 )
+            while (Directories.Count > 0)
             {
-                if ( Directories[0].LinkTarget == null )
-                    GetSubDirectories(Directories[0], Node, MaxDepth, (Depth+1));
+                if (Directories[0].LinkTarget == null)
+                    GetSubDirectories(Directories[0], Node, MaxDepth, (Depth + 1));
                 Directories.RemoveAt(0);
             }
         }
@@ -198,6 +221,9 @@ namespace favs
 
             foreach (DriveInfo drive in allDrives)
             {
+                //if (drive.Name[0] != 'c' && drive.Name[0] != 'C')
+                //    continue;
+
                 GetFileSizeFromDir(new DirectoryInfo(drive.Name));
                 GetSubDirectories(new DirectoryInfo(drive.Name), null, 3, 0);
             }
@@ -205,44 +231,90 @@ namespace favs
 
         static int count = 0;
 
+
+        private bool DoesNodesToPathExist(string Path)
+        {
+            TreeNode[] foundNodes = trvFileChanges.Nodes.Find(Path, true);
+            if (foundNodes != null && foundNodes.Length >= 1)
+                return true;
+
+            return false;
+        }
+        private void CreateNodesToPath(string Path)
+        {
+            string[] strPathDirs = Path.Split('\\');
+            string strCurrentDir = "";
+            TreeNode closestPath = trvFileChanges.TopNode;
+
+            for (int iDir = 0; iDir < strPathDirs.Length; iDir++)
+            {
+                //set the current directory path and prepare for another subdir (unless last subdir / file)
+                strCurrentDir += strPathDirs[iDir] + (iDir < (strPathDirs.Length - 1) ? "\\" : "");
+                TreeNode[] foundPath = trvFileChanges.Nodes.Find(strCurrentDir, true);
+
+                if (foundPath != null && foundPath.Length >= 1)
+                {
+                    closestPath = foundPath[0];
+                    continue;
+                }
+
+                if (closestPath == null)
+                {
+                    closestPath = trvFileChanges.Nodes.Add(strCurrentDir, strPathDirs[iDir]);
+                    continue;
+                }
+
+                closestPath = closestPath.Nodes.Add(strCurrentDir, strPathDirs[iDir]);
+            }
+        }
+
         private void ReadFromMessages(object sender)
         {
             Interlocked.Increment(ref count);
 
             //throw new Exception("InMyCodeException - Are You Actually Calling In My Code");
-            List<String> lstMessages = new List<string>();
+            List<FileChangeInformation> lstMessages = new List<FileChangeInformation>();
 
             lock (_oMsgsLock)
             {
-                for( int iMsg = 0; iMsg < _qConsoleMessages.Count; iMsg++ )
+                for (int iMsg = 0; iMsg < _qConsoleMessages.Count; iMsg++)
                 {
                     lstMessages.Add(_qConsoleMessages.Dequeue());
                 }
             }
 
-            lstConsole.Invoke(new Action(() =>
-               {
-                   bool bAtLastItem = false;
+            trvFileChanges.Invoke(new Action(() =>
+            {
+                bool bAtLastItem = false;
 
-                   if (null == lstMessages || 0 == lstMessages.Count)
-                       return;
+                if (null == lstMessages || 0 == lstMessages.Count)
+                    return;
 
-                   if (lstConsole.Items.Count - 1 == lstConsole.SelectedIndex)
-                       bAtLastItem = true;
+                //
+                // Do some kind of message list to reveal when things are being done
+                //  message queue history...
+                //
+                //if (lstConsole.Items.Count - 1 == lstConsole.SelectedIndex)
+                //    bAtLastItem = true;
 
-                   foreach (string msg in lstMessages)
-                   {
-                       lstConsole.Items.Add(msg);
-                   }
+                foreach (FileChangeInformation fci in lstMessages)
+                {
+                    if (DoesNodesToPathExist(fci.FullPath) == false)
+                        CreateNodesToPath(fci.FullPath);
 
-                   if (true == bAtLastItem)
-                       lstConsole.SelectedIndex = lstConsole.Items.Count - 1;
-               }));
+                    TreeNode[] FoundNodes = trvFileChanges.Nodes.Find(fci.FullPath, true);
+
+                    if (FoundNodes.Length == 0)
+                        System.Diagnostics.Debug.Assert(false);
+
+                    TreeNode tevent = FoundNodes[0].Nodes.Add(fci.EventTime.ToShortTimeString() + " " + fci.Message);
+                }
+            }));
 
             //System.Diagnostics.Debug.WriteLine("Read From Messages: {0}", count);
         }
 
-        private void WriteToMessages(string Out)
+        private void WriteToMessages(FileChangeInformation Out)
         {
             lock (_oMsgsLock)
             {
@@ -252,17 +324,18 @@ namespace favs
 
         private void FileSystemWatcher_OnEvent(object sender, FileSystemEventArgs e)
         {
-            String strEventInformation = "";
+            FileChangeInformation fciNewEvent = new FileChangeInformation(e.FullPath, e.ChangeType.ToString(), DateTime.Now);
 
-            strEventInformation = e.ChangeType.ToString() + " - " + e.FullPath;
-            WriteToMessages(strEventInformation);
+            WriteToMessages(fciNewEvent);
         }
 
         private void FileSystemWatcher_OnError(object sender, ErrorEventArgs e)
         {
             string strErrorInformation = "";
             strErrorInformation = "Error: " + e.ToString();
-            WriteToMessages(strErrorInformation);
+
+            //WriteToMessages(strErrorInformation);
+            System.Diagnostics.Debug.WriteLine(strErrorInformation);
         }
 
         private void SetupFileSystemWatcher(string Path)
@@ -284,8 +357,6 @@ namespace favs
         public FrmFavs()
         {
             InitializeComponent();
-            lstConsole.Items.Add(" ");
-            lstConsole.SelectedIndex = 0;
             SetupFileSystemWatcher(@"C:\");
         }
 
@@ -293,12 +364,12 @@ namespace favs
         {
             _ReadMessagesTimer = new System.Threading.Timer(ReadFromMessages);
             _ReadMessagesTimer.Change(500, 500);
-           // PopulateFileSystemView();
+            PopulateFileSystemView();
         }
 
         private void trvFileSystem_AfterExpand(object sender, TreeViewEventArgs e)
         {
-            for ( int i = 0; i < e.Node.Nodes.Count; i++ )
+            for (int i = 0; i < e.Node.Nodes.Count; i++)
             {
                 if (0 == e.Node.Nodes[i].Nodes.Count)
                 {
@@ -313,7 +384,7 @@ namespace favs
         private void FrmFavs_FormClosing(object sender, FormClosingEventArgs e)
         {
             lstExceptionPath.Sort();
-            foreach(string path in lstExceptionPath)
+            foreach (string path in lstExceptionPath)
             {
                 System.Diagnostics.Debug.WriteLine(path);
             }
@@ -321,10 +392,10 @@ namespace favs
 
         private void FrmFavs_Shown(object sender, EventArgs e)
         {
-            PopulateFileSystemView();
+            //PopulateFileSystemView();
 
-            System.IO.DriveInfo[] allDrives = System.IO.DriveInfo.GetDrives();
-            
+            //System.IO.DriveInfo[] allDrives = System.IO.DriveInfo.GetDrives();
+
             //foreach (DriveInfo drive in allDrives )
             //{
             //    var TotalFreeSpace = drive.TotalFreeSpace;
@@ -340,7 +411,7 @@ namespace favs
         {
             var tagData = e.Node.Tag;
 
-            GetFilesFromPath(((ValueTuple<string,float>)tagData).Item1);
+            GetFilesFromPath(((ValueTuple<string, float>)tagData).Item1);
         }
 
         private int lvFilesSortColumn = 0;
@@ -348,14 +419,14 @@ namespace favs
         private void lvFiles_ColumnClick(object sender, ColumnClickEventArgs e)
         {
 
-            if ( lvFilesSortColumn != e.Column )
+            if (lvFilesSortColumn != e.Column)
             {
                 lvFilesSortColumn = e.Column;
                 lvSortOrder = SortOrder.Ascending;
             }
             else
             {
-                switch(lvSortOrder)
+                switch (lvSortOrder)
                 {
                     case SortOrder.Ascending:
                         lvSortOrder = SortOrder.Descending;
@@ -376,7 +447,7 @@ namespace favs
         {
             private int _SortByColumn = 0;
             bool _SortLong = false;
-            public ListViewItemComparer() 
+            public ListViewItemComparer()
             {
                 _SortByColumn = 0;
                 _SortLong = false;
@@ -385,7 +456,7 @@ namespace favs
             public ListViewItemComparer(int Column)
             {
                 _SortByColumn = Column;
-                if ( 1 == _SortByColumn)
+                if (1 == _SortByColumn)
                 {
                     _SortLong = true;
                 }
@@ -393,11 +464,11 @@ namespace favs
 
             public int Compare(object A, object B)
             {
-                ValueTuple<string,long> vObjectA, vObjectB;
+                ValueTuple<string, long> vObjectA, vObjectB;
                 ListView lvContaining = null;
                 int iSortOrder = 1;
                 //null check 'Check to see if necessary first I suppose
-                if ( null == A || null == B )
+                if (null == A || null == B)
                 {
                     throw new Exception("Object is null Exception");
                 }
@@ -417,7 +488,7 @@ namespace favs
                 lvContaining = ((ListViewItem)A).ListView;
                 iSortOrder = (SortOrder.Ascending == lvContaining.Sorting ? 1 : -1);
 
-                if ( _SortLong )
+                if (_SortLong)
                 {
                     if (vObjectA.Item2 == vObjectB.Item2)
                         return 0;
